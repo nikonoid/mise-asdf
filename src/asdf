@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# asdf shim — translates asdf CLI calls into mise equivalents.
+# Allows team scripts written for asdf to run unchanged on a mise setup.
+set -euo pipefail
+
+cmd="${1:-help}"; shift || true
+
+case "$cmd" in
+
+  # ── tool management ──────────────────────────────────────────────
+  install)   exec mise install "$@" ;;
+  uninstall) exec mise uninstall "$@" ;;
+  current)   exec mise current "$@" ;;
+  where)     exec mise where "$@" ;;
+  which)     exec mise which "$@" ;;
+  latest)    exec mise latest "$@" ;;
+  shell)     exec mise shell "$@" ;;
+
+  # ── version pinning ─────────────────────────────────────────────
+  local)  exec mise use "$@" ;;
+  global) exec mise use -g "$@" ;;
+
+  # ── list ────────────────────────────────────────────────────────
+  # asdf list           → mise ls
+  # asdf list <name>    → mise ls <name>
+  # asdf list all …     → mise ls-remote …
+  list)
+    subcmd="${1:-}"
+    if [ "$subcmd" = "all" ]; then
+      shift
+      exec mise ls-remote "$@"
+    fi
+    exec mise ls "$@"
+    ;;
+  list-all) exec mise ls-remote "$@" ;;
+
+  # ── plugin management ───────────────────────────────────────────
+  plugin)
+    subcmd="${1:-list}"; shift || true
+    case "$subcmd" in
+      add)
+        # Core runtimes (ruby, node, python …) are built into mise;
+        # the explicit "add" is unnecessary.  Try it, swallow failures.
+        mise plugins add "$@" 2>/dev/null || true
+        exit 0
+        ;;
+      list)   exec mise plugins ls "$@" ;;
+      remove) exec mise plugins rm "$@" ;;
+      update) exec mise plugins update "$@" ;;
+      *)      exec mise plugins "$subcmd" "$@" ;;
+    esac
+    ;;
+
+  # ── misc ────────────────────────────────────────────────────────
+  reshim) exit 0 ;;
+  update) exec mise upgrade "$@" ;;
+  exec)   exec mise exec -- "$@" ;;
+  env)    exec mise env "$@" ;;
+  info)   exec mise doctor "$@" ;;
+
+  version|--version|-v)
+    echo "asdf shim (mise-asdf plugin) — $(mise --version)"
+    exit 0
+    ;;
+
+  help|--help|-h)
+    cat <<'HELP'
+asdf shim — translates asdf commands into mise equivalents.
+
+This is not real asdf.  It is a thin wrapper so that scripts and
+workflows written for asdf work transparently with mise.
+
+Mapped commands:
+  install, uninstall, current, where, which, latest, shell,
+  local, global, list [all], list-all, plugin {add|list|remove|update},
+  reshim, update, exec, env, info, version, help
+
+Anything not listed above is forwarded to mise as-is.
+
+Docs: https://github.com/nikonoid/mise-asdf
+HELP
+    exit 0
+    ;;
+
+  # ── catch-all: forward unknown commands to mise ─────────────────
+  *) exec mise "$cmd" "$@" ;;
+esac

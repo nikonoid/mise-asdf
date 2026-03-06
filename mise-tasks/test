@@ -1,18 +1,40 @@
 #!/usr/bin/env bash
-#MISE description="Run plugin tests - install and execute tool"
+#MISE description="Test the asdf shim plugin locally"
 set -euo pipefail
 
-mise plugin link --force <TOOL> .
-mise cache clear
-mise install <TOOL>@1.0.0
+echo "==> Linking plugin for local development…"
+mise plugin link --force asdf .
 
-# Capture and display the output while also verifying it
-output=$(mise exec "<TOOL>@1.0.0" -- "<TOOL>" --version)
-echo "<TOOL> output: $output"
+echo "==> Copying shim into place (local-only, bypasses download)…"
+install_dir="$(mise where asdf 2>/dev/null || true)"
+if [ -z "$install_dir" ]; then
+    # Create a fake installed version so we can test the shim directly
+    install_dir="${MISE_DATA_DIR:-$HOME/.local/share/mise}/installs/asdf/dev"
+    mkdir -p "$install_dir/bin"
+fi
+cp src/asdf "$install_dir/bin/asdf"
+chmod +x "$install_dir/bin/asdf"
 
-if echo "$output" | grep -q '<TOOL>@1.0.0'; then
-    echo "✓ Tests passed"
-else
-    echo "✗ Test failed: expected version <TOOL>@1.0.0"
+echo "==> Testing shim commands…"
+
+# version / help should work
+output=$("$install_dir/bin/asdf" version)
+echo "  version:  $output"
+if ! echo "$output" | grep -q "mise-asdf"; then
+    echo "✗ version output missing mise-asdf identifier"
     exit 1
 fi
+
+output=$("$install_dir/bin/asdf" help)
+echo "  help:     (ok, ${#output} chars)"
+if ! echo "$output" | grep -q "asdf shim"; then
+    echo "✗ help output missing expected text"
+    exit 1
+fi
+
+# reshim should be a silent no-op
+"$install_dir/bin/asdf" reshim
+echo "  reshim:   ok (no-op)"
+
+echo ""
+echo "✓ All tests passed"
