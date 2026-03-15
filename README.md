@@ -21,7 +21,7 @@ mise use asdf@latest
 # Or install directly from GitHub
 mise plugin add asdf https://github.com/nikonoid/mise-asdf
 mise install asdf@latest
-mise use asdf@latest
+mise use -g asdf@latest
 ```
 
 After installation, `asdf` on your `PATH` resolves to the shim:
